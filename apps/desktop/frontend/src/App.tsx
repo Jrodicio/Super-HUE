@@ -38,8 +38,9 @@ export function App() {
 
   useEffect(() => {
     api.bootstrap().then((data) => {
-      setState(data);
-      setBridgeIP(data.settings.bridge_ip ?? data.dashboard.connectionStatus.bridgeIp ?? '');
+      const nextState = normalizeAppState(data);
+      setState(nextState);
+      setBridgeIP(nextState.settings.bridge_ip ?? nextState.dashboard.connectionStatus.bridgeIp ?? '');
     }).catch((err) => setError(err.message));
   }, []);
 
@@ -47,7 +48,7 @@ export function App() {
     setError('');
     if (success) setNotice('');
     try {
-      const data = await promise;
+      const data = normalizeAppState(await promise);
       setState(data);
       setBridgeIP(data.settings.bridge_ip ?? bridgeIP);
       if (success) setNotice(success);
@@ -312,6 +313,26 @@ export function App() {
   );
 }
 
+
+function normalizeAppState(data: AppState): AppState {
+  return {
+    dashboard: {
+      connectionStatus: data.dashboard?.connectionStatus ?? emptyState.dashboard.connectionStatus,
+      lightsCount: data.dashboard?.lightsCount ?? 0,
+      activeRules: data.dashboard?.activeRules ?? 0,
+      devicesPresent: data.dashboard?.devicesPresent ?? 0,
+      recentLogs: data.dashboard?.recentLogs ?? [],
+    },
+    lights: data.lights ?? [],
+    rooms: data.rooms ?? [],
+    scenes: data.scenes ?? [],
+    rules: data.rules ?? [],
+    devices: data.devices ?? [],
+    logs: data.logs ?? [],
+    settings: data.settings ?? {},
+  };
+}
+
 function buildRuleForTrigger(trigger: TriggerType, rule: Rule): Rule {
   const base = { ...rule, trigger };
   switch (trigger) {
@@ -363,10 +384,12 @@ function MetricCard({ label, value, detail }: { label: string; value: string; de
   );
 }
 
-function LogsList({ logs }: { logs: LogEntry[] }) {
+function LogsList({ logs }: { logs: LogEntry[] | null | undefined }) {
+  const safeLogs = logs ?? [];
+
   return (
     <div className="log-list">
-      {logs.length === 0 ? <span className="muted-note">Todavía no hay logs.</span> : logs.map((log) => (
+      {safeLogs.length === 0 ? <span className="muted-note">Todavía no hay logs.</span> : safeLogs.map((log) => (
         <div className="log-row" key={`${log.id}-${log.createdAt}`}>
           <span className={`chip ${log.level === 'ERROR' ? 'danger' : log.level === 'WARN' ? 'warn' : 'success'}`}>{log.level}</span>
           <div>
