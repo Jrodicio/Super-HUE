@@ -1,0 +1,9 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "super-hue",
+  "outputfilename": "super-hue",
+  "frontend:install": "echo frontend prebuilt",
+  "frontend:build": "echo frontend dist ready",
+  "frontend:dev:watcher": "echo static frontend mode",
+  "frontend:dir": "apps/desktop/frontend"
+}
