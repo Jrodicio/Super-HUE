@@ -2,8 +2,9 @@
   "$schema": "https://wails.io/schemas/config.v2.json",
   "name": "super-hue",
   "outputfilename": "super-hue",
-  "frontend:install": "echo frontend prebuilt",
-  "frontend:build": "echo frontend dist ready",
-  "frontend:dev:watcher": "echo static frontend mode",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "http://localhost:34115",
   "frontend:dir": "frontend"
 }
