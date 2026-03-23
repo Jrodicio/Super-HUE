@@ -5,5 +5,5 @@
   "frontend:install": "echo frontend prebuilt",
   "frontend:build": "echo frontend dist ready",
   "frontend:dev:watcher": "echo static frontend mode",
-  "frontend:dir": "apps/desktop/frontend"
+  "frontend:dir": "frontend"
 }
