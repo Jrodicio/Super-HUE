@@ -138,6 +138,31 @@ func (a *App) DeleteDevice(id int64) (domain.AppState, error) {
 	return a.service.Bootstrap(a.ctx)
 }
 
+func (a *App) SaveRoom(room domain.Room) (domain.AppState, error) {
+	if err := a.service.SaveRoom(a.ctx, room); err != nil {
+		return domain.AppState{}, err
+	}
+	return a.service.Bootstrap(a.ctx)
+}
+
+func (a *App) DeleteRoom(roomID string) (domain.AppState, error) {
+	if err := a.service.DeleteRoom(a.ctx, roomID); err != nil {
+		return domain.AppState{}, err
+	}
+	return a.service.Bootstrap(a.ctx)
+}
+
+func (a *App) AssignLightRoom(lightID string, roomID string) (domain.AppState, error) {
+	if err := a.service.AssignLightRoom(a.ctx, lightID, roomID); err != nil {
+		return domain.AppState{}, err
+	}
+	return a.service.Bootstrap(a.ctx)
+}
+
+func (a *App) ScanNetworkIPs() ([]string, error) {
+	return a.service.ScanNetworkIPs(a.ctx)
+}
+
 func (a *App) PingAutomationNow() string {
 	go func() {
 		a.automation.Events() <- domain.RuleEvent{Trigger: domain.TriggerTimeSchedule, Name: "manual", Value: time.Now().Format("15:04")}
