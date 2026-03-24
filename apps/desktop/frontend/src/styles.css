@@ -80,7 +80,7 @@ input, select {
   border-radius: 14px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #eff5ff;
   padding: 12px 14px;
 }
-.rules-table, .device-list, .log-list { display: grid; gap: 12px; }
+.rules-table, .device-list, .log-list { display: grid; gap: 12px; overflow-y: auto }
 .rule-actions { display: flex; align-items: center; gap: 10px; }
 .chip { border-radius: 999px; padding: 8px 10px; font-size: 0.76rem; letter-spacing: 0.03em; }
 .chip.success { background: rgba(61, 208, 140, 0.16); color: #aff5ce; }
