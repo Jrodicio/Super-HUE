@@ -90,6 +90,7 @@ export interface AppState {
   lights: Light[];
   rooms: Room[];
   scenes: Scene[];
+  recentApps: string[];
   rules: Rule[];
   devices: Device[];
   logs: LogEntry[];

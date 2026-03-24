@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"superhue/internal/domain"
@@ -177,6 +178,36 @@ func (r *HueRepository) ListScenes(ctx context.Context) ([]domain.Scene, error) 
 		result = append(result, scene)
 	}
 	return result, rows.Err()
+}
+
+func (r *HueRepository) SaveRoom(ctx context.Context, room *domain.Room) error {
+	room.ID = strings.TrimSpace(room.ID)
+	room.Name = strings.TrimSpace(room.Name)
+	if room.ID == "" {
+		room.ID = fmt.Sprintf("local-%d", time.Now().UTC().UnixNano())
+	}
+	_, err := r.db.ExecContext(ctx, `INSERT INTO rooms(id, name, type, updated_at) VALUES(?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET name = excluded.name, type = excluded.type, updated_at = CURRENT_TIMESTAMP`, room.ID, room.Name, room.Type)
+	return err
+}
+
+func (r *HueRepository) DeleteRoom(ctx context.Context, roomID string) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `UPDATE lights_cache SET room_id = '', room_name = '' WHERE room_id = ?`, roomID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM rooms WHERE id = ?`, roomID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (r *HueRepository) AssignLightRoom(ctx context.Context, lightID, roomID, roomName string) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE lights_cache SET room_id = ?, room_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, roomID, roomName, lightID)
+	return err
 }
 
 func (r *RuleRepository) List(ctx context.Context) ([]domain.Rule, error) {
