@@ -59,8 +59,8 @@ export function App() {
     }
   };
 
-  const lightsByRoom = useMemo(() => {
-    return [...state.lights].sort((a, b) => a.roomName.localeCompare(b.roomName) || a.name.localeCompare(b.name));
+  const sortedLights = useMemo(() => {
+    return [...state.lights].sort((a, b) => a.name.localeCompare(b.name));
   }, [state.lights]);
 
   const saveRule = () => {
@@ -137,8 +137,12 @@ export function App() {
         {view === 'lights' && (
           <SectionCard title="Control de luces" subtitle="On/off, brillo y color por luz">
             <div className="lights-grid">
-              {lightsByRoom.map((light) => (
-                <div className="light-card" key={light.id}>
+              {sortedLights.map((light) => (
+                <div
+                  className="light-card"
+                  key={light.id}
+                  style={{ backgroundColor: cardBackgroundColor(light.colorHex, light.on, light.reachable) }}
+                >
                   <div className="light-header">
                     <div>
                       <strong>{light.name}</strong>
@@ -156,10 +160,15 @@ export function App() {
                   </div>
                   <div className="field-row">
                     <label>Color</label>
-                    <input type="color" value={light.colorHex || '#FFFFFF'} onChange={(e) => { setBusy(`color-${light.id}`); applyState(api.setLightColor(light.id, e.target.value)); }} />
+                    <input
+                      type="color"
+                      value={light.colorHex || '#FFFFFF'}
+                      style={{ backgroundColor: light.colorHex || '#FFFFFF' }}
+                      onChange={(e) => { setBusy(`color-${light.id}`); applyState(api.setLightColor(light.id, e.target.value)); }}
+                    />
                     <span>{light.colorHex}</span>
                   </div>
-                  <span className={light.reachable ? 'chip success' : 'chip muted'}>{light.reachable ? 'Disponible' : 'No reachable'}</span>
+                  <span className={light.reachable ? 'chip success availability-chip' : 'chip muted availability-chip'}>{light.reachable ? 'Disponible' : 'No reachable'}</span>
                 </div>
               ))}
             </div>
@@ -311,6 +320,28 @@ export function App() {
       </main>
     </div>
   );
+}
+
+function cardBackgroundColor(colorHex: string, isOn: boolean, isReachable: boolean) {
+  if (!isOn || !isReachable) {
+    return 'rgba(0, 0, 0, 0.35)';
+  }
+
+  return hexToRgba(colorHex || '#000000', 0.26);
+}
+
+function hexToRgba(colorHex: string, alpha: number) {
+  const normalized = colorHex.replace('#', '');
+
+  if (normalized.length !== 6) {
+    return `rgba(0, 0, 0, ${alpha})`;
+  }
+
+  const r = Number.parseInt(normalized.slice(0, 2), 16);
+  const g = Number.parseInt(normalized.slice(2, 4), 16);
+  const b = Number.parseInt(normalized.slice(4, 6), 16);
+
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 
