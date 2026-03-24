@@ -128,7 +128,7 @@ export function App() {
                 <li>SQLite local: {state.settings.bridge_ip ? 'configurada' : 'lista para usar'}</li>
               </ul>
             </SectionCard>
-            <SectionCard title="Últimos eventos" subtitle="Logs recientes del sistema">
+            <SectionCard className="span-3" title="Últimos eventos" subtitle="Logs recientes del sistema">
               <LogsList logs={state.dashboard.recentLogs} />
             </SectionCard>
           </div>
