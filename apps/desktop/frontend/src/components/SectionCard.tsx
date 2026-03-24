@@ -1,8 +1,8 @@
 import { PropsWithChildren } from 'react';
 
-export function SectionCard({ title, subtitle, children }: PropsWithChildren<{ title: string; subtitle?: string }>) {
+export function SectionCard({ title, subtitle, className, children }: PropsWithChildren<{ title: string; subtitle?: string; className?: string }>) {
   return (
-    <section className="section-card">
+    <section className={className ? `section-card ${className}` : 'section-card'}>
       <div className="section-header">
         <div>
           <h3>{title}</h3>
