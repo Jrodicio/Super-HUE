@@ -13,7 +13,7 @@ const emptyState: AppState = {
     devicesPresent: 0,
     recentLogs: [],
   },
-  lights: [], rooms: [], scenes: [], rules: [], devices: [], logs: [], settings: {},
+  lights: [], rooms: [], scenes: [], recentApps: [], rules: [], devices: [], logs: [], settings: {},
 };
 
 const defaultRule = (): Rule => ({
@@ -25,6 +25,7 @@ const defaultRule = (): Rule => ({
 });
 
 const defaultDevice: Device = { name: '', ip: '', present: false, failureCount: 0, consecutiveOks: 0, lastCheckedAt: '', lastSeenAt: '' };
+const defaultRoom = { id: '', name: '', type: 'room' };
 
 export function App() {
   const [state, setState] = useState<AppState>(emptyState);
@@ -32,6 +33,8 @@ export function App() {
   const [bridgeIP, setBridgeIP] = useState('');
   const [ruleDraft, setRuleDraft] = useState<Rule>(defaultRule());
   const [deviceDraft, setDeviceDraft] = useState<Device>(defaultDevice);
+  const [roomDraft, setRoomDraft] = useState(defaultRoom);
+  const [foundIPs, setFoundIPs] = useState<string[]>([]);
   const [busy, setBusy] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [notice, setNotice] = useState<string>('');
@@ -41,7 +44,7 @@ export function App() {
       const nextState = normalizeAppState(data);
       setState(nextState);
       setBridgeIP(nextState.settings.bridge_ip ?? nextState.dashboard.connectionStatus.bridgeIp ?? '');
-    }).catch((err) => setError(err.message));
+    }).catch((err) => setError(errorMessage(err)));
   }, []);
 
   const applyState = async (promise: Promise<AppState>, success?: string) => {
@@ -53,7 +56,7 @@ export function App() {
       setBridgeIP(data.settings.bridge_ip ?? bridgeIP);
       if (success) setNotice(success);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(errorMessage(err));
     } finally {
       setBusy('');
     }
@@ -64,15 +67,33 @@ export function App() {
   }, [state.lights]);
 
   const saveRule = () => {
+    if (!ruleDraft.name.trim()) {
+      setError('El nombre de la regla es obligatorio');
+      return;
+    }
     setBusy('save-rule');
     applyState(api.saveRule(ruleDraft), 'Regla guardada');
     setRuleDraft(defaultRule());
   };
 
   const saveDevice = () => {
+    if (!deviceDraft.name.trim() || !deviceDraft.ip.trim()) {
+      setError('Nombre e IP son obligatorios');
+      return;
+    }
     setBusy('save-device');
     applyState(api.saveDevice(deviceDraft), 'Dispositivo guardado');
     setDeviceDraft(defaultDevice);
+  };
+
+  const saveRoom = () => {
+    if (!roomDraft.name.trim()) {
+      setError('El nombre de la sala es obligatorio');
+      return;
+    }
+    setBusy('save-room');
+    applyState(api.saveRoom(roomDraft), 'Sala guardada');
+    setRoomDraft(defaultRoom);
   };
 
   return (
@@ -135,44 +156,83 @@ export function App() {
         )}
 
         {view === 'lights' && (
-          <SectionCard title="Control de luces" subtitle="On/off, brillo y color por luz">
-            <div className="lights-grid">
-              {sortedLights.map((light) => (
-                <div
-                  className="light-card"
-                  key={light.id}
-                  style={{ backgroundColor: cardBackgroundColor(light.colorHex, light.on, light.reachable) }}
-                >
-                  <div className="light-header">
-                    <div>
-                      <strong>{light.name}</strong>
-                      <span>{light.roomName || 'Sin room'}</span>
+          <div className="stack">
+            <SectionCard title="Control de luces" subtitle="On/off, brillo, color y sala por luz">
+              <div className="lights-grid">
+                {sortedLights.map((light) => (
+                  <div
+                    className="light-card"
+                    key={light.id}
+                    style={{ backgroundColor: cardBackgroundColor(light.colorHex, light.on, light.reachable) }}
+                  >
+                    <div className="light-header">
+                      <div>
+                        <strong>{light.name}</strong>
+                        <span>{light.roomName || 'Sin sala'}</span>
+                      </div>
+                      <label className="switch">
+                        <input type="checkbox" checked={light.on} onChange={(e) => { setBusy(`light-${light.id}`); applyState(api.setLightPower(light.id, e.target.checked)); }} />
+                        <span />
+                      </label>
                     </div>
-                    <label className="switch">
-                      <input type="checkbox" checked={light.on} onChange={(e) => { setBusy(`light-${light.id}`); applyState(api.setLightPower(light.id, e.target.checked)); }} />
-                      <span />
+                    <div className="field-row">
+                      <label>Brillo</label>
+                      <input type="range" min={0} max={100} value={light.brightness} onChange={(e) => setState((prev) => ({ ...prev, lights: prev.lights.map((item) => item.id === light.id ? { ...item, brightness: Number(e.target.value) } : item) }))} onMouseUp={() => { setBusy(`bri-${light.id}`); applyState(api.setLightBrightness(light.id, light.brightness)); }} onTouchEnd={() => { setBusy(`bri-${light.id}`); applyState(api.setLightBrightness(light.id, light.brightness)); }} />
+                      <span>{light.brightness}%</span>
+                    </div>
+                    <div className="field-row">
+                      <label>Color</label>
+                      <input
+                        type="color"
+                        value={light.colorHex || '#FFFFFF'}
+                        style={{ backgroundColor: light.colorHex || '#FFFFFF' }}
+                        onChange={(e) => { setBusy(`color-${light.id}`); applyState(api.setLightColor(light.id, e.target.value)); }}
+                      />
+                      <span>{light.colorHex}</span>
+                    </div>
+                    <label>
+                      Sala
+                      <select value={light.roomId || ''} onChange={(e) => { setBusy(`room-${light.id}`); applyState(api.assignLightRoom(light.id, e.target.value), 'Sala actualizada'); }}>
+                        <option value="">Sin sala</option>
+                        {state.rooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
+                      </select>
                     </label>
+                    <span className={light.reachable ? 'chip success availability-chip' : 'chip muted availability-chip'}>{light.reachable ? 'Disponible' : 'No disponible'}</span>
                   </div>
-                  <div className="field-row">
-                    <label>Brillo</label>
-                    <input type="range" min={0} max={100} value={light.brightness} onChange={(e) => setState((prev) => ({ ...prev, lights: prev.lights.map((item) => item.id === light.id ? { ...item, brightness: Number(e.target.value) } : item) }))} onMouseUp={() => { setBusy(`bri-${light.id}`); applyState(api.setLightBrightness(light.id, light.brightness)); }} onTouchEnd={() => { setBusy(`bri-${light.id}`); applyState(api.setLightBrightness(light.id, light.brightness)); }} />
-                    <span>{light.brightness}%</span>
-                  </div>
-                  <div className="field-row">
-                    <label>Color</label>
-                    <input
-                      type="color"
-                      value={light.colorHex || '#FFFFFF'}
-                      style={{ backgroundColor: light.colorHex || '#FFFFFF' }}
-                      onChange={(e) => { setBusy(`color-${light.id}`); applyState(api.setLightColor(light.id, e.target.value)); }}
-                    />
-                    <span>{light.colorHex}</span>
-                  </div>
-                  <span className={light.reachable ? 'chip success availability-chip' : 'chip muted availability-chip'}>{light.reachable ? 'Disponible' : 'No reachable'}</span>
+                ))}
+              </div>
+            </SectionCard>
+
+            <SectionCard title="Salas" subtitle="Alta, baja y modificación de salas">
+              <div className="two-col">
+                <div className="form-grid compact">
+                  <label>
+                    Nombre de sala
+                    <input value={roomDraft.name} onChange={(e) => setRoomDraft((prev) => ({ ...prev, name: e.target.value }))} placeholder="Escritorio" />
+                  </label>
+                  <label>
+                    Tipo
+                    <input value={roomDraft.type} onChange={(e) => setRoomDraft((prev) => ({ ...prev, type: e.target.value }))} placeholder="room" />
+                  </label>
+                  <button className="primary-btn" disabled={busy === 'save-room'} onClick={saveRoom}>{roomDraft.id ? 'Actualizar sala' : 'Crear sala'}</button>
                 </div>
-              ))}
-            </div>
-          </SectionCard>
+                <div className="device-list">
+                  {state.rooms.map((room) => (
+                    <div className="rule-row" key={room.id}>
+                      <div>
+                        <strong>{room.name}</strong>
+                        <p>{room.type}</p>
+                      </div>
+                      <div className="rule-actions">
+                        <button className="ghost-btn" onClick={() => setRoomDraft(room)}>Editar</button>
+                        <button className="ghost-btn danger" onClick={() => { setBusy(`delete-room-${room.id}`); applyState(api.deleteRoom(room.id), 'Sala eliminada'); }}>Eliminar</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </SectionCard>
+          </div>
         )}
 
         {view === 'scenes' && (
@@ -200,21 +260,27 @@ export function App() {
                     <input value={ruleDraft.name} onChange={(e) => setRuleDraft({ ...ruleDraft, name: e.target.value })} placeholder="Gaming mode" />
                   </label>
                   <label>
-                    Trigger
+                    Evento disparador
                     <select value={ruleDraft.trigger} onChange={(e) => setRuleDraft(buildRuleForTrigger(e.target.value as TriggerType, ruleDraft))}>
-                      <option value="PROCESS_START">PROCESS_START</option>
-                      <option value="PROCESS_STOP">PROCESS_STOP</option>
-                      <option value="TIME_SCHEDULE">TIME_SCHEDULE</option>
-                      <option value="NETWORK_PRESENCE">NETWORK_PRESENCE</option>
+                      <option value="PROCESS_START">Proceso iniciado</option>
+                      <option value="PROCESS_STOP">Proceso detenido</option>
+                      <option value="TIME_SCHEDULE">Horario programado</option>
+                      <option value="NETWORK_PRESENCE">Presencia en red</option>
                     </select>
                   </label>
                   <label>
-                    Condición valor
-                    <input value={ruleDraft.conditions[0]?.value ?? ''} onChange={(e) => setRuleDraft({ ...ruleDraft, conditions: [{ ...ruleDraft.conditions[0], value: e.target.value }] })} placeholder={placeholderForTrigger(ruleDraft.trigger)} />
+                    Condición de valor
+                    <div className="field-inline">
+                      <select value={ruleDraft.conditions[0]?.value ?? ''} onChange={(e) => setRuleDraft({ ...ruleDraft, conditions: [{ ...ruleDraft.conditions[0], value: e.target.value }] })}>
+                        <option value="">Seleccionar</option>
+                        {ruleDraft.trigger !== 'PROCESS_START' && ruleDraft.trigger !== 'PROCESS_STOP' ? null : state.recentApps.map((app) => <option key={app} value={app}>{app}</option>)}
+                      </select>
+                      <input value={ruleDraft.conditions[0]?.value ?? ''} onChange={(e) => setRuleDraft({ ...ruleDraft, conditions: [{ ...ruleDraft.conditions[0], value: e.target.value }] })} placeholder={placeholderForTrigger(ruleDraft.trigger)} />
+                    </div>
                   </label>
                   {ruleDraft.trigger === 'NETWORK_PRESENCE' ? (
                     <label>
-                      Dispositivo
+                      Dispositivos en red
                       <select value={ruleDraft.conditions[0]?.key ?? ''} onChange={(e) => setRuleDraft({ ...ruleDraft, conditions: [{ ...ruleDraft.conditions[0], key: e.target.value }] })}>
                         <option value="">Seleccionar</option>
                         {state.devices.map((device) => <option key={device.id} value={device.name}>{device.name}</option>)}
@@ -224,20 +290,29 @@ export function App() {
                   <label>
                     Acción
                     <select value={ruleDraft.actions[0]?.type ?? 'ACTIVATE_SCENE'} onChange={(e) => setRuleDraft(buildAction(e.target.value as ActionType, ruleDraft))}>
-                      <option value="ACTIVATE_SCENE">ACTIVATE_SCENE</option>
-                      <option value="TURN_ON_LIGHT">TURN_ON_LIGHT</option>
-                      <option value="TURN_OFF_LIGHT">TURN_OFF_LIGHT</option>
-                      <option value="SET_BRIGHTNESS">SET_BRIGHTNESS</option>
-                      <option value="SET_COLOR">SET_COLOR</option>
-                      <option value="TURN_OFF_ALL">TURN_OFF_ALL</option>
+                      <option value="ACTIVATE_SCENE">Encender escena</option>
+                      <option value="TURN_OFF_LIGHT">Apagar sala</option>
+                      <option value="SET_BRIGHTNESS">Ajustar brillo</option>
+                      <option value="SET_COLOR">Cambiar color</option>
+                      <option value="TURN_OFF_ALL">Apagar todo</option>
                     </select>
                   </label>
+                  {ruleDraft.actions[0]?.type === 'ACTIVATE_SCENE' ? (
+                    <label>
+                      Sala objetivo
+                      <select value={ruleDraft.actions[0]?.value ?? ''} onChange={(e) => setRuleDraft({ ...ruleDraft, actions: [{ ...ruleDraft.actions[0], value: e.target.value, target: '' }] })}>
+                        <option value="">Seleccionar sala</option>
+                        {state.rooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
+                      </select>
+                    </label>
+                  ) : null}
                   <label>
                     Objetivo
                     <select value={ruleDraft.actions[0]?.target ?? ''} onChange={(e) => setRuleDraft({ ...ruleDraft, actions: [{ ...ruleDraft.actions[0], target: e.target.value }] })}>
                       <option value="">Seleccionar</option>
-                      {ruleDraft.actions[0]?.type === 'ACTIVATE_SCENE' && state.scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name}</option>)}
-                      {ruleDraft.actions[0]?.type !== 'ACTIVATE_SCENE' && ruleDraft.actions[0]?.type !== 'TURN_OFF_ALL' && state.lights.map((light) => <option key={light.id} value={light.id}>{light.name}</option>)}
+                      {ruleDraft.actions[0]?.type === 'ACTIVATE_SCENE' && state.scenes.filter((scene) => !ruleDraft.actions[0]?.value || scene.groupId === ruleDraft.actions[0]?.value).map((scene) => <option key={scene.id} value={scene.id}>{scene.group ? `${scene.group} · ` : ''}{scene.name}</option>)}
+                      {ruleDraft.actions[0]?.type === 'TURN_OFF_LIGHT' && state.rooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
+                      {(ruleDraft.actions[0]?.type === 'SET_BRIGHTNESS' || ruleDraft.actions[0]?.type === 'SET_COLOR') && state.lights.map((light) => <option key={light.id} value={light.id}>{light.name}</option>)}
                     </select>
                   </label>
                   {(ruleDraft.actions[0]?.type === 'SET_BRIGHTNESS' || ruleDraft.actions[0]?.type === 'SET_COLOR') ? (
@@ -276,6 +351,14 @@ export function App() {
                     IP local
                     <input value={deviceDraft.ip} onChange={(e) => setDeviceDraft({ ...deviceDraft, ip: e.target.value })} placeholder="192.168.1.50" />
                   </label>
+                  <label>
+                    Detectados en red
+                    <select value={deviceDraft.ip} onChange={(e) => setDeviceDraft({ ...deviceDraft, ip: e.target.value })}>
+                      <option value="">Seleccionar IP detectada</option>
+                      {foundIPs.map((ip) => <option key={ip} value={ip}>{ip}</option>)}
+                    </select>
+                  </label>
+                  <button className="ghost-btn" onClick={() => api.scanNetworkIPs().then(setFoundIPs).catch((err) => setError(errorMessage(err)))}>Buscar dispositivos automáticamente</button>
                   <button className="primary-btn" disabled={busy === 'save-device'} onClick={saveDevice}>Guardar dispositivo</button>
                 </div>
                 <div className="device-list">
@@ -357,11 +440,22 @@ function normalizeAppState(data: AppState): AppState {
     lights: data.lights ?? [],
     rooms: data.rooms ?? [],
     scenes: data.scenes ?? [],
+    recentApps: data.recentApps ?? [],
     rules: data.rules ?? [],
     devices: data.devices ?? [],
     logs: data.logs ?? [],
     settings: data.settings ?? {},
   };
+}
+
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'string') return err;
+  if (typeof err === 'object' && err !== null && 'message' in err) {
+    const message = (err as { message?: unknown }).message;
+    if (typeof message === 'string' && message.trim()) return message;
+  }
+  return 'Error desconocido';
 }
 
 function buildRuleForTrigger(trigger: TriggerType, rule: Rule): Rule {
