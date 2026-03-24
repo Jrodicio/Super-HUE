@@ -73,6 +73,14 @@ button { cursor: pointer; }
 .field-row { margin-top: 16px; }
 .field-row label { min-width: 60px; }
 .field-row input[type='range'] { flex: 1; }
+.field-row input[type='color'] {
+  width: 42px;
+  height: 30px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.18);
+  padding: 2px;
+}
+.availability-chip { margin-top: 14px; }
 .switch { position: relative; width: 54px; height: 30px; }
 .switch input { display: none; }
 .switch span { position: absolute; inset: 0; background: #34465c; border-radius: 999px; }
