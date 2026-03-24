@@ -131,14 +131,15 @@ type Dashboard struct {
 }
 
 type AppState struct {
-	Dashboard Dashboard         `json:"dashboard"`
-	Lights    []Light           `json:"lights"`
-	Rooms     []Room            `json:"rooms"`
-	Scenes    []Scene           `json:"scenes"`
-	Rules     []Rule            `json:"rules"`
-	Devices   []Device          `json:"devices"`
-	Logs      []LogEntry        `json:"logs"`
-	Settings  map[string]string `json:"settings"`
+	Dashboard  Dashboard         `json:"dashboard"`
+	Lights     []Light           `json:"lights"`
+	Rooms      []Room            `json:"rooms"`
+	Scenes     []Scene           `json:"scenes"`
+	RecentApps []string          `json:"recentApps"`
+	Rules      []Rule            `json:"rules"`
+	Devices    []Device          `json:"devices"`
+	Logs       []LogEntry        `json:"logs"`
+	Settings   map[string]string `json:"settings"`
 }
 
 type RuleEvent struct {

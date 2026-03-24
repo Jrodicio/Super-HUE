@@ -16,6 +16,10 @@ declare global {
           DeleteRule(id: number): Promise<AppState>;
           SaveDevice(device: Device): Promise<AppState>;
           DeleteDevice(id: number): Promise<AppState>;
+          SaveRoom(room: { id?: string; name: string; type: string }): Promise<AppState>;
+          DeleteRoom(roomID: string): Promise<AppState>;
+          AssignLightRoom(lightID: string, roomID: string): Promise<AppState>;
+          ScanNetworkIPs(): Promise<string[]>;
           PingAutomationNow(): Promise<string>;
           DataPath(): Promise<string>;
         };
@@ -38,6 +42,10 @@ export const api = {
   deleteRule: (id: number) => app()?.DeleteRule(id) ?? Promise.reject(new Error('Wails bridge no disponible')),
   saveDevice: (device: Device) => app()?.SaveDevice(device) ?? Promise.reject(new Error('Wails bridge no disponible')),
   deleteDevice: (id: number) => app()?.DeleteDevice(id) ?? Promise.reject(new Error('Wails bridge no disponible')),
+  saveRoom: (room: { id?: string; name: string; type: string }) => app()?.SaveRoom(room) ?? Promise.reject(new Error('Wails bridge no disponible')),
+  deleteRoom: (roomID: string) => app()?.DeleteRoom(roomID) ?? Promise.reject(new Error('Wails bridge no disponible')),
+  assignLightRoom: (lightID: string, roomID: string) => app()?.AssignLightRoom(lightID, roomID) ?? Promise.reject(new Error('Wails bridge no disponible')),
+  scanNetworkIPs: () => app()?.ScanNetworkIPs() ?? Promise.reject(new Error('Wails bridge no disponible')),
   pingAutomationNow: () => app()?.PingAutomationNow() ?? Promise.reject(new Error('Wails bridge no disponible')),
   dataPath: () => app()?.DataPath() ?? Promise.reject(new Error('Wails bridge no disponible')),
 };

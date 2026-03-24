@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"superhue/internal/domain"
+	"superhue/internal/infrastructure"
 )
 
 type AppService struct {
@@ -29,6 +31,7 @@ func (s *AppService) Bootstrap(ctx context.Context) (domain.AppState, error) {
 	lights, _ := s.hueRepo.ListLights(ctx)
 	rooms, _ := s.hueRepo.ListRooms(ctx)
 	scenes, _ := s.hueRepo.ListScenes(ctx)
+	recentApps, _ := infrastructure.ListRunningProcesses(ctx)
 	rules, _ := s.ruleRepo.List(ctx)
 	devices, _ := s.devRepo.List(ctx)
 	logs, _ := s.logRepo.List(ctx, 25)
@@ -46,7 +49,7 @@ func (s *AppService) Bootstrap(ctx context.Context) (domain.AppState, error) {
 	}
 	return domain.AppState{
 		Dashboard: domain.Dashboard{ConnectionStatus: status, LightsCount: len(lights), ActiveRules: activeRules, DevicesPresent: devicesPresent, RecentLogs: logs},
-		Lights:    lights, Rooms: rooms, Scenes: scenes, Rules: rules, Devices: devices, Logs: logs, Settings: settings,
+		Lights:    lights, Rooms: rooms, Scenes: scenes, RecentApps: recentApps, Rules: rules, Devices: devices, Logs: logs, Settings: settings,
 	}, nil
 }
 
@@ -128,11 +131,63 @@ func (s *AppService) SaveRule(ctx context.Context, rule domain.Rule) error {
 	if len(rule.Actions) == 0 {
 		return errors.New("la regla debe tener al menos una acción")
 	}
+	if len(rule.Conditions) == 0 {
+		return errors.New("la regla debe tener al menos una condición")
+	}
 	if err := s.ruleRepo.Save(ctx, &rule); err != nil {
 		return err
 	}
 	s.logger.Info(ctx, "automation", fmt.Sprintf("Regla guardada: %s", rule.Name))
 	return nil
+}
+
+func (s *AppService) SaveRoom(ctx context.Context, room domain.Room) error {
+	if strings.TrimSpace(room.Name) == "" {
+		return errors.New("el nombre de la sala es obligatorio")
+	}
+	if strings.TrimSpace(room.Type) == "" {
+		room.Type = "room"
+	}
+	if err := s.hueRepo.SaveRoom(ctx, &room); err != nil {
+		return err
+	}
+	s.logger.Info(ctx, "rooms", fmt.Sprintf("Sala guardada: %s", room.Name))
+	return nil
+}
+
+func (s *AppService) DeleteRoom(ctx context.Context, roomID string) error {
+	if strings.TrimSpace(roomID) == "" {
+		return errors.New("id de sala inválido")
+	}
+	if err := s.hueRepo.DeleteRoom(ctx, roomID); err != nil {
+		return err
+	}
+	s.logger.Info(ctx, "rooms", fmt.Sprintf("Sala eliminada: %s", roomID))
+	return nil
+}
+
+func (s *AppService) AssignLightRoom(ctx context.Context, lightID, roomID string) error {
+	rooms, err := s.hueRepo.ListRooms(ctx)
+	if err != nil {
+		return err
+	}
+	roomName := ""
+	if roomID != "" {
+		idx := slices.IndexFunc(rooms, func(r domain.Room) bool { return r.ID == roomID })
+		if idx < 0 {
+			return errors.New("sala no encontrada")
+		}
+		roomName = rooms[idx].Name
+	}
+	if err := s.hueRepo.AssignLightRoom(ctx, lightID, roomID, roomName); err != nil {
+		return err
+	}
+	s.logger.Info(ctx, "rooms", fmt.Sprintf("Luz %s asignada a sala %s", lightID, roomName))
+	return nil
+}
+
+func (s *AppService) ScanNetworkIPs(ctx context.Context) ([]string, error) {
+	return infrastructure.ScanNetworkIPs(ctx)
 }
 
 func (s *AppService) DeleteRule(ctx context.Context, id int64) error {
@@ -170,8 +225,17 @@ func (s *AppService) ExecuteActions(ctx context.Context, actions []domain.Action
 				return err
 			}
 		case domain.ActionTurnOffLight:
-			if err := s.hue.SetLightPower(ctx, action.Target, false); err != nil {
+			lights, err := s.hueRepo.ListLights(ctx)
+			if err != nil {
 				return err
+			}
+			for _, light := range lights {
+				if light.RoomID != action.Target {
+					continue
+				}
+				if err := s.hue.SetLightPower(ctx, light.ID, false); err != nil {
+					return err
+				}
 			}
 		case domain.ActionSetBrightness:
 			var brightness int
