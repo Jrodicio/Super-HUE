@@ -386,19 +386,41 @@ function MetricCard({ label, value, detail }: { label: string; value: string; de
 
 function LogsList({ logs }: { logs: LogEntry[] | null | undefined }) {
   const safeLogs = logs ?? [];
+  const itemsPerPage = 10;
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [safeLogs.length]);
+
+  const totalPages = Math.max(1, Math.ceil(safeLogs.length / itemsPerPage));
+  const currentPage = Math.min(page, totalPages);
+  const pagedLogs = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return safeLogs.slice(start, start + itemsPerPage);
+  }, [currentPage, safeLogs]);
 
   return (
-    <div className="log-list">
-      {safeLogs.length === 0 ? <span className="muted-note">Todavía no hay logs.</span> : safeLogs.map((log) => (
-        <div className="log-row" key={`${log.id}-${log.createdAt}`}>
-          <span className={`chip ${log.level === 'ERROR' ? 'danger' : log.level === 'WARN' ? 'warn' : 'success'}`}>{log.level}</span>
-          <div>
-            <strong>{log.source}</strong>
-            <p>{log.message}</p>
+    <div className="log-list-wrap">
+      <div className="log-list">
+        {safeLogs.length === 0 ? <span className="muted-note">Todavía no hay logs.</span> : pagedLogs.map((log) => (
+          <div className="log-row" key={`${log.id}-${log.createdAt}`}>
+            <span className={`chip ${log.level === 'ERROR' ? 'danger' : log.level === 'WARN' ? 'warn' : 'success'}`}>{log.level}</span>
+            <div>
+              <strong>{log.source}</strong>
+              <p>{log.message}</p>
+            </div>
+            <time>{formatDate(log.createdAt)}</time>
           </div>
-          <time>{formatDate(log.createdAt)}</time>
+        ))}
+      </div>
+      {safeLogs.length > itemsPerPage ? (
+        <div className="pagination">
+          <button className="ghost-btn" disabled={currentPage === 1} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>Anterior</button>
+          <span>Página {currentPage} de {totalPages}</span>
+          <button className="ghost-btn" disabled={currentPage === totalPages} onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}>Siguiente</button>
         </div>
-      ))}
+      ) : null}
     </div>
   );
 }
