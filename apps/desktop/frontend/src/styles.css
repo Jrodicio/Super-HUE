@@ -96,6 +96,11 @@ input, select {
   border-radius: 14px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #eff5ff;
   padding: 12px 14px;
 }
+select option {
+  background: #0b1b2f;
+  color: #ffffff;
+}
+.field-inline { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .rules-table, .device-list, .log-list { display: grid; gap: 12px; overflow-y: auto }
 .log-list-wrap { display: grid; gap: 12px; }
 .log-list { max-height: 460px; padding-right: 4px; }

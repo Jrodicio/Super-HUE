@@ -15,6 +15,9 @@ type HueRepository interface {
 	ListLights(ctx context.Context) ([]Light, error)
 	ListRooms(ctx context.Context) ([]Room, error)
 	ListScenes(ctx context.Context) ([]Scene, error)
+	SaveRoom(ctx context.Context, room *Room) error
+	DeleteRoom(ctx context.Context, roomID string) error
+	AssignLightRoom(ctx context.Context, lightID, roomID, roomName string) error
 }
 
 type RuleRepository interface {

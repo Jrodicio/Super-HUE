@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -79,5 +80,18 @@ func listProcesses(ctx context.Context) (map[string]struct{}, error) {
 		}
 		result[strings.ToLower(line)] = struct{}{}
 	}
+	return result, nil
+}
+
+func ListRunningProcesses(ctx context.Context) ([]string, error) {
+	items, err := listProcesses(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]string, 0, len(items))
+	for name := range items {
+		result = append(result, name)
+	}
+	slices.Sort(result)
 	return result, nil
 }
